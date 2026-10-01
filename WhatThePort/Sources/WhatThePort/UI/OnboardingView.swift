@@ -173,11 +173,11 @@ struct OnboardingView: View {
             OnboardingCard {
                 OnboardingSummary(
                     title: status.isScanning ? L10n.text("Checking this Mac…") : L10n.format("%d %@ detected", status.detectedCount, L10n.counted("tool", "tools", count: status.detectedCount)),
-                    detail: status.isScanning ? L10n.format("%d of 4 found", status.detectedCount) : L10n.text("Scan complete")
+                    detail: status.isScanning ? L10n.format("%d of %d found", status.detectedCount, OnboardingTool.allCases.count) : L10n.text("Scan complete")
                 )
                 ForEach(OnboardingTool.allCases, id: \.self) { tool in
                     RowDivider()
-                    OnboardingRow(title: tool.name, icon: AnyView(toolIcon(tool))) {
+                    OnboardingRow(title: tool.name, icon: AnyView(toolIcon(tool)), compact: true) {
                         OnboardingConfirmation(state: status.tools[tool] ?? .loading(L10n.text("Checking…")), monospaced: true)
                     }
                 }
@@ -245,6 +245,7 @@ struct OnboardingView: View {
         case .claude: ToolIcon(agent: .claudeCode)
         case .codex: ToolIcon(agent: .codex)
         case .conductor: ToolIcon(systemName: "square.grid.2x2")
+        case .pane: ToolIcon(systemName: "rectangle.split.2x1")
         case .github: ToolIcon(systemName: "arrow.triangle.branch")
         }
     }
@@ -373,6 +374,7 @@ private struct OnboardingRow<Control: View>: View {
     let title: String
     var caption: String?
     var icon: AnyView?
+    var compact = false
     @ViewBuilder let control: Control
 
     var body: some View {
@@ -386,8 +388,8 @@ private struct OnboardingRow<Control: View>: View {
             control
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, caption == nil ? 10 : 14)
-        .frame(minHeight: caption == nil ? 49 : 64)
+        .padding(.vertical, compact ? 6 : caption == nil ? 10 : 14)
+        .frame(minHeight: compact ? 41 : caption == nil ? 49 : 64)
         .accessibilityElement(children: .contain)
     }
 }
