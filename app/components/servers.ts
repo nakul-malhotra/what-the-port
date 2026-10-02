@@ -4,7 +4,7 @@ import type { Localizer } from './languages'
 // Sample data for the marketing demo. Keep presentation aligned with the native SwiftUI views.
 // Memory values use binary MB, matching Theme.swift / Format.
 
-export type Agent = 'claude' | 'codex'
+export type Agent = 'claude' | 'codex' | 'copilot'
 export type CleanUpReason = 'deleted' | 'idle' | 'leaking'
 
 export type Server = {
@@ -43,14 +43,14 @@ export const SERVERS: Server[] = [
     chart: 'steady',
     spark: 'M0 13 L4 12 L8 12.5 L12 10 L16 11 L20 8 L24 9 L28 7 L32 8 L36 6 L40 6.5 L44 5',
     processes: [
-      { pid: 48212, command: 'node next dev', memory: 796, cpu: 9 },
+      { pid: 48212, command: 'node', memory: 796, cpu: 9 },
       { pid: 48213, command: 'next-server', memory: 418, cpu: 3 },
-      { pid: 48214, command: 'tailwindcss --watch', memory: 26, cpu: 0 },
+      { pid: 48214, command: 'tailwindcss', memory: 26, cpu: 0 },
     ],
     info: [
       ['Folder', '~/conductor/workspaces/what-the-port/providence'],
       ['Framework', 'Next.js 14'],
-      ['Command', 'npm run dev'],
+      ['Command', 'node'],
       ['PID', '48213'],
       ['Started', 'Today 10:12 AM'],
       ['Workspace', 'Conductor · providence'],
@@ -70,13 +70,13 @@ export const SERVERS: Server[] = [
     chart: 'steady',
     spark: 'M0 10 L4 10.5 L8 9.5 L12 10 L16 9 L20 10 L24 9.5 L28 10 L32 9 L36 9.5 L40 9 L44 9.5',
     processes: [
-      { pid: 30877, command: 'astro dev', memory: 571, cpu: 2 },
+      { pid: 30877, command: 'astro', memory: 571, cpu: 2 },
       { pid: 30878, command: 'esbuild', memory: 41, cpu: 0 },
     ],
     info: [
       ['Folder', '~/Sites/tomjohn.design'],
       ['Framework', 'Astro 4'],
-      ['Command', 'npm run dev -- --port 3001'],
+      ['Command', 'astro'],
       ['PID', '30877'],
       ['Started', 'Yesterday 9:02 AM'],
       ['Git', 'clean'],
@@ -91,13 +91,13 @@ export const SERVERS: Server[] = [
     cpu: 0,
     cpuNote: 'idle since 8:31',
     uptime: 'idle 5h',
-    context: { agent: 'codex', text: 'paper plugins · idle 5h' },
+    context: { agent: 'copilot', text: 'paper plugins · idle 5h' },
     lines: (l) => ({
       context: `paper plugins · ${l.format('idle %@', l.duration(300, true))}`,
       note: l.format('Idle %@ · no connections', l.duration(300, true)),
       running: l.duration(300),
     }),
-    session: { agent: 'codex', title: 'SVG export for frames', id: 'c7e20b91' },
+    session: { agent: 'copilot', title: 'Copilot CLI session', id: 'c7e20b91' },
     chart: 'flat',
     spark: 'M0 13 L4 13 L8 12.5 L12 13 L16 13 L20 13 L24 12.5 L28 13 L32 13 L36 13 L40 13 L44 13',
     processes: [
@@ -107,7 +107,7 @@ export const SERVERS: Server[] = [
     info: [
       ['Folder', '~/conductor/workspaces/paper-plugins/lisbon'],
       ['Framework', 'Vite 5'],
-      ['Command', 'pnpm dev'],
+      ['Command', 'vite'],
       ['PID', '51092'],
       ['Started', 'Today 7:58 AM'],
       ['Workspace', 'Conductor · lisbon'],
@@ -133,14 +133,14 @@ export const SERVERS: Server[] = [
     chart: 'leaking',
     spark: 'M0 16 L4 15.5 L8 14.5 L12 14 L16 12.5 L20 12 L24 10 L28 9 L32 7 L36 5.5 L40 4 L44 2',
     processes: [
-      { pid: 61540, command: 'storybook dev -p 6006', memory: 2210, cpu: 30 },
+      { pid: 61540, command: 'storybook', memory: 2210, cpu: 30 },
       { pid: 61541, command: 'webpack', memory: 548, cpu: 4 },
       { pid: 61542, command: 'node', memory: 52, cpu: 0 },
     ],
     info: [
       ['Folder', '~/Code/design-system/worktrees/tokens-v2'],
       ['Framework', 'Storybook 8'],
-      ['Command', 'npm run storybook'],
+      ['Command', 'storybook'],
       ['PID', '61540'],
       ['Started', 'Today 10:44 AM'],
       ['Git', '3 changed files'],
@@ -165,11 +165,11 @@ export const SERVERS: Server[] = [
     }),
     chart: 'flat',
     spark: 'M0 12 L44 12',
-    processes: [{ pid: 22718, command: 'uvicorn main:app', memory: 96, cpu: 0 }],
+    processes: [{ pid: 22718, command: 'uvicorn', memory: 96, cpu: 0 }],
     info: [
       ['Folder', '~/Code/api-fix-auth (deleted)'],
       ['Framework', 'FastAPI'],
-      ['Command', 'uvicorn main:app --port 8000'],
+      ['Command', 'uvicorn'],
       ['PID', '22718'],
       ['Started', 'Mon 3:40 PM'],
       ['Worktree', 'deleted'],
