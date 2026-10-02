@@ -4,7 +4,8 @@ import Testing
 @testable import WhatThePort
 
 struct ProcessControlTests {
-    @Test func restartAndStopPreserveOwnedLaunchInputs() async throws {
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["WTP_TEST_HOME"] != nil))
+    func restartAndStopPreserveOwnedLaunchInputs() async throws {
         guard let homePath = ProcessInfo.processInfo.environment["WTP_TEST_HOME"] else { return }
         let home = URL(fileURLWithPath: homePath).standardizedFileURL
         #expect(FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL == home)
@@ -15,7 +16,7 @@ struct ProcessControlTests {
         let port = try availablePort()
         let fingerprint = fixture.appendingPathComponent("fingerprint.json")
         let secret = "wtp-process-control-env-secret"
-        let python = "/opt/homebrew/bin/python3"
+        let python = try pythonExecutable()
         let script = """
         import http.server, json, os, sys
         with open(sys.argv[2], "w") as output:
@@ -42,6 +43,9 @@ struct ProcessControlTests {
         try await waitForListener(port)
         let relaunchedPID = try #require(SocketScanner.scan().listenerPidsByPort[port]?.first)
         let relaunchedStart = try #require(ProcessInspector.snapshot(relaunchedPID)?.startTime)
+        defer {
+            ProcessControl.stop(makeServer(port: port, pid: relaunchedPID, start: relaunchedStart, launch: nil, directory: fixture))
+        }
         let result = try JSONSerialization.jsonObject(with: Data(contentsOf: fingerprint)) as? [String: Any]
         #expect(result?["argv"] as? [String] == [String(port), fingerprint.path, "--api-key=wtp-process-control-argv-secret"])
         #expect(result?["secret"] as? String == secret)
@@ -65,6 +69,15 @@ struct ProcessControlTests {
         process.standardError = FileHandle.nullDevice
         try process.run()
         return process
+    }
+
+    private func pythonExecutable() throws -> String {
+        let paths = ProcessInfo.processInfo.environment["PATH"]?.split(separator: ":") ?? []
+        for directory in paths {
+            let candidate = URL(fileURLWithPath: String(directory)).appendingPathComponent("python3").path
+            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+        }
+        throw CocoaError(.fileNoSuchFile)
     }
 
     private func makeServer(port: Int, pid: pid_t, start: Date, launch: ProcArgs?, directory: URL) -> Server {

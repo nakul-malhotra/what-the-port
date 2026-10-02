@@ -219,7 +219,11 @@ final class ScanEngine: @unchecked Sendable {
     private static func isAgentPath(_ path: String) -> Bool {
         let components = URL(fileURLWithPath: path).standardized.pathComponents
         if components.contains("@anthropic-ai"), components.contains("claude-code") { return true }
-        if components.contains("@github"), components.contains("copilot") { return true }
+        if let github = components.firstIndex(of: "@github"),
+           components.indices.contains(github + 1),
+           components[github + 1] == "copilot" || components[github + 1].hasPrefix("copilot-") {
+            return true
+        }
         if components.contains("codex") { return true }
         return components.contains("com.conductor.app")
     }
@@ -257,11 +261,12 @@ final class ScanEngine: @unchecked Sendable {
         var current = listener
         var extraHops = 2
         while current.ppid > 1, let parent = processes[current.ppid], chain.count < 10 {
+            chain.append(parent)
+            if isAgent(parent) { break }
             if current.pid == root.pid || chain.contains(where: { $0.pid == root.pid }) {
                 guard extraHops > 0 else { break }
                 extraHops -= 1
             }
-            chain.append(parent)
             current = parent
         }
         var environment: [String: String] = [:]
@@ -271,7 +276,10 @@ final class ScanEngine: @unchecked Sendable {
             if let id = values["COPILOT_AGENT_SESSION_ID"], !id.isEmpty { copilotIDs.insert(id) }
             environment.merge(values) { _, closer in closer }
         }
-        if copilotIDs.count > 1 { environment.removeValue(forKey: "COPILOT_AGENT_SESSION_ID") }
+        if copilotIDs.count > 1 {
+            environment.removeValue(forKey: "COPILOT_AGENT_SESSION_ID")
+            environment["WTP_COPILOT_SESSION_AMBIGUOUS"] = "1"
+        }
         return environment
     }
 

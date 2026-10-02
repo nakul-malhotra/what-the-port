@@ -307,6 +307,46 @@ struct ScanEngineTests {
         #expect(f.scan()[0].agent == nil)
     }
 
+    @Test func recognizedCopilotLauncherBoundsInheritedEnvironment() {
+        let f = Fixture()
+        f.process(5, name: "zsh")
+        f.arguments[5] = ProcArgs(
+            executablePath: "/bin/zsh",
+            arguments: ["zsh"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "11111111-1111-4111-8111-111111111111"]
+        )
+        f.process(10, parent: 5, name: "node")
+        f.arguments[10] = ProcArgs(
+            executablePath: "/node_modules/@github/copilot-darwin-arm64/bin/copilot",
+            arguments: ["copilot"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "22222222-2222-4222-8222-222222222222"]
+        )
+        f.process(20, parent: 10)
+        f.listen(20, port: 3000)
+
+        #expect(f.scan()[0].agent?.id == "22222222-2222-4222-8222-222222222222")
+    }
+
+    @Test func ambiguousCopilotAncestrySuppressesCodexFallback() {
+        let f = Fixture()
+        f.process(5, name: "zsh")
+        f.arguments[5] = ProcArgs(
+            executablePath: "/bin/zsh",
+            arguments: ["zsh"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "11111111-1111-4111-8111-111111111111"]
+        )
+        f.process(10, parent: 5, name: "zsh")
+        f.arguments[10] = ProcArgs(
+            executablePath: "/bin/zsh",
+            arguments: ["zsh"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "22222222-2222-4222-8222-222222222222"]
+        )
+        f.process(20, parent: 10)
+        f.listen(20, port: 3000)
+
+        #expect(f.scan()[0].agent == nil)
+    }
+
     @Test func fullCommandPreservesEveryArgumentBoundary() {
         let f = Fixture()
         let arguments = ["node", "script with spaces", "", " leading ", "quote'arg"]
@@ -329,5 +369,29 @@ struct ScanEngineTests {
         f.listen(20, port: 3000)
 
         #expect(f.scan()[0].rootPid == 10)
+    }
+
+    @Test func copilotPackageMarkerRequiresAdjacentPackageComponents() {
+        let f = Fixture()
+        f.process(10)
+        f.arguments[10] = ProcArgs(
+            executablePath: "/node_modules/@github/unrelated/copilot/bin/copilot",
+            arguments: ["copilot"],
+            environment: [:]
+        )
+        f.process(20, parent: 10)
+        f.listen(20, port: 3000)
+        #expect(f.scan()[0].rootPid == 10)
+
+        let recognized = Fixture()
+        recognized.process(10)
+        recognized.arguments[10] = ProcArgs(
+            executablePath: "/node_modules/@github/copilot-darwin-arm64/bin/copilot",
+            arguments: ["copilot"],
+            environment: [:]
+        )
+        recognized.process(20, parent: 10)
+        recognized.listen(20, port: 3000)
+        #expect(recognized.scan()[0].rootPid == 20)
     }
 }

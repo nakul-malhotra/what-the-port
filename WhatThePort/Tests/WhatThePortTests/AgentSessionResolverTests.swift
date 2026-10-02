@@ -36,6 +36,24 @@ struct AgentSessionResolverTests {
         #expect(resolver.resolve(environment: [:], cwd: "/shared/project", codex: false) == nil)
     }
 
+    @Test func ambiguousCopilotSignalDoesNotFallBackToCodex() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let project = home.appendingPathComponent("project")
+        let sessions = home.appendingPathComponent(".codex/sessions")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try """
+        {"payload":{"id":"codex-session","cwd":"\(project.path)"}}
+        """.write(to: sessions.appendingPathComponent("session.jsonl"), atomically: true, encoding: .utf8)
+
+        let resolver = AgentSessionResolver(home: home)
+        #expect(resolver.resolve(environment: [:], cwd: project.path)?.kind == .codex)
+        #expect(resolver.resolve(
+            environment: ["WTP_COPILOT_SESSION_AMBIGUOUS": "1"],
+            cwd: project.path
+        ) == nil)
+    }
+
     @Test func malformedCopilotWorkspaceStaysLimitedWithoutCrashing() throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: home) }

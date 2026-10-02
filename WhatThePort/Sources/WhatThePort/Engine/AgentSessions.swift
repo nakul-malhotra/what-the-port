@@ -68,7 +68,8 @@ final class AgentSessionResolver {
             return copilotSession(id: id)
         }
         // A server started by Claude Code shouldn't be claimed by a Codex session in the same folder.
-        guard codex, environment["CLAUDE_CODE_SESSION_ID"] == nil, let cwd else { return nil }
+        guard codex, environment["CLAUDE_CODE_SESSION_ID"] == nil,
+              environment["WTP_COPILOT_SESSION_AMBIGUOUS"] == nil, let cwd else { return nil }
         refreshCodexIndexIfNeeded()
         // Walk up from the server's directory, but never match a session that was
         // started in the home folder or above; that would claim every server.
