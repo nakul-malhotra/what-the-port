@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum AgentKind: String {
     case claudeCode = "Claude Code"
@@ -96,13 +97,21 @@ final class AgentSessionResolver {
 
     private static func readCopilotWorkspace(of url: URL, id: String) -> (directory: String?, state: SessionMetadataState) {
         let limit = 64 * 1024
-        guard FileManager.default.fileExists(atPath: url.path) else { return (nil, .unavailable) }
-        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else { return (nil, .unavailable) }
-        guard size <= limit, let data = try? Data(contentsOf: url) else { return (nil, .limited) }
+        let descriptor = open(url.path, O_RDONLY | O_NONBLOCK)
+        guard descriptor >= 0 else { return (nil, .unavailable) }
+        defer { close(descriptor) }
+        var info = stat()
+        guard fstat(descriptor, &info) == 0 else { return (nil, .unavailable) }
+        guard (info.st_mode & S_IFMT) == S_IFREG else { return (nil, .limited) }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: false)
+        guard let data = try? handle.read(upToCount: limit + 1) else { return (nil, .unavailable) }
+        guard data.count <= limit else { return (nil, .limited) }
         return workspaceDirectory(in: String(decoding: data, as: UTF8.self), id: id)
     }
 
     private static func workspaceDirectory(in metadata: String, id: String) -> (directory: String?, state: SessionMetadataState) {
+        var directory: String?
+        var declaredIDs = Set<String>()
         for line in metadata.split(separator: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             let parts = trimmed.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
@@ -111,13 +120,16 @@ final class AgentSessionResolver {
             let value = parts[1]
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-            if ["id", "sessionId", "session_id"].contains(key), !value.isEmpty, value.lowercased() != id {
-                return (nil, .limited)
+            if ["id", "sessionId", "session_id"].contains(key) {
+                guard let declaredID = validSessionID(value) else { return (nil, .limited) }
+                declaredIDs.insert(declaredID)
+                continue
             }
             guard key == "cwd" || key == "workspace" else { continue }
-            if value.hasPrefix("/") { return (value, .available) }
+            if value.hasPrefix("/") { directory = value }
         }
-        return (nil, .limited)
+        guard declaredIDs.count <= 1, declaredIDs.allSatisfy({ $0 == id }), let directory else { return (nil, .limited) }
+        return (directory, .available)
     }
 
     // MARK: - Claude Code

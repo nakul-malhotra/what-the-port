@@ -394,4 +394,28 @@ struct ScanEngineTests {
         recognized.listen(20, port: 3000)
         #expect(recognized.scan()[0].rootPid == 20)
     }
+
+    @Test func nodeRuntimeFlagsStillProtectAgentScriptsWithoutMatchingEvalValues() {
+        let f = Fixture()
+        f.process(10)
+        f.arguments[10] = ProcArgs(
+            executablePath: "/usr/local/bin/node",
+            arguments: ["node", "--no-warnings", "/node_modules/@anthropic-ai/claude-code/cli.js"],
+            environment: [:]
+        )
+        f.process(20, parent: 10)
+        f.listen(20, port: 3000)
+        #expect(f.scan()[0].rootPid == 20)
+
+        let eval = Fixture()
+        eval.process(10)
+        eval.arguments[10] = ProcArgs(
+            executablePath: "/usr/local/bin/node",
+            arguments: ["node", "--eval", "require('/node_modules/@github/copilot/index.js')"],
+            environment: [:]
+        )
+        eval.process(20, parent: 10)
+        eval.listen(20, port: 3000)
+        #expect(eval.scan()[0].rootPid == 10)
+    }
 }

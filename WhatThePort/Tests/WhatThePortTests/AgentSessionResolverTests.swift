@@ -68,4 +68,22 @@ struct AgentSessionResolverTests {
         #expect(session.directory == nil)
         #expect(session.metadataState == .limited)
     }
+
+    @Test func copilotWorkspaceValidatesIdentityFieldsAfterDirectory() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let workspace = home.appendingPathComponent(".copilot/session-state/\(id)/workspace.yaml")
+        try FileManager.default.createDirectory(at: workspace.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try """
+        cwd: /fixture/project
+        sessionId: 11111111-1111-4111-8111-111111111111
+        """.write(to: workspace, atomically: true, encoding: .utf8)
+
+        let session = try #require(AgentSessionResolver(home: home).resolve(
+            environment: ["COPILOT_AGENT_SESSION_ID": id],
+            cwd: "/shared/project"
+        ))
+        #expect(session.directory == nil)
+        #expect(session.metadataState == .limited)
+    }
 }

@@ -212,8 +212,30 @@ final class ScanEngine: @unchecked Sendable {
     private func isAgent(_ process: ProcSnapshot) -> Bool {
         if Self.agentNames.contains(process.comm) { return true }
         guard let args = args(for: process) else { return false }
-        let paths = [args.executablePath] + args.arguments.prefix(2).filter { $0.hasPrefix("/") || $0.hasPrefix(".") }
+        let paths = [args.executablePath] + Self.scriptOperands(in: args.arguments)
         return paths.contains(where: Self.isAgentPath)
+    }
+
+    private static func scriptOperands(in arguments: [String]) -> [String] {
+        var index = arguments.first == "node" ? 1 : 0
+        while index < arguments.count {
+            let argument = arguments[index]
+            if ["-e", "--eval", "-p", "--print", "-r", "--require", "--import", "--loader"].contains(argument) {
+                index += 2
+                continue
+            }
+            if argument.hasPrefix("--eval=") || argument.hasPrefix("--print=") ||
+                argument.hasPrefix("--require=") || argument.hasPrefix("--import=") || argument.hasPrefix("--loader=") {
+                index += 1
+                continue
+            }
+            if argument.hasPrefix("-") {
+                index += 1
+                continue
+            }
+            return argument.hasPrefix("/") || argument.hasPrefix(".") ? [argument] : []
+        }
+        return []
     }
 
     private static func isAgentPath(_ path: String) -> Bool {
