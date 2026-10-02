@@ -16,6 +16,7 @@ struct ServerDetailView: View {
 
     @AppStorage("detail.infoExpanded") private var infoExpanded = false
     @AppStorage("detail.processesExpanded") private var processesExpanded = false
+    @AppStorage(Preferences.showFullCommands) private var showFullCommands = false
     /// Shared between both charts so hovering one scrubs the other.
     @State private var hoverTime: Date?
 
@@ -124,7 +125,7 @@ struct ServerDetailView: View {
         if let framework = server.project.framework {
             rows.append(InfoRow(label: L10n.text("Framework"), tooltip: framework) { Text(framework).font(Theme.body).foregroundStyle(Theme.text2) })
         }
-        if let command = server.command {
+        if let command = server.displayedCommand(showFull: showFullCommands) {
             rows.append(InfoRow(label: L10n.text("Command"), tooltip: command) { Text(command).font(Theme.mono).foregroundStyle(Theme.text2) })
         }
         if let started = server.startedAt {
@@ -198,13 +199,14 @@ struct ServerDetailView: View {
                 let largest = max(server.processes.map(\.memory).max() ?? 1, 1)
                 VStack(spacing: 5) {
                     ForEach(server.processes) { process in
+                        let name = showFullCommands ? process.rawName : process.name
                         HStack(spacing: 0) {
-                            Text((process.depth > 0 ? String(repeating: "  ", count: process.depth - 1) + "└ " : "") + process.name)
+                            Text((process.depth > 0 ? String(repeating: "  ", count: process.depth - 1) + "└ " : "") + name)
                                 .font(Theme.mono)
                                 .foregroundStyle(process.pid == server.pid ? Theme.text1 : Theme.text1.opacity(0.8))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                                .help(process.name)
+                                .help(name)
                             Spacer(minLength: 8)
                             Text(String(process.pid)).font(Theme.monoCaption).foregroundStyle(Theme.text3)
                                 .frame(width: 52, alignment: .leading)
@@ -255,7 +257,7 @@ struct ServerDetailView: View {
 
             Menu {
                 Button(L10n.text("Copy URL")) { copy(server.url.absoluteString) }
-                if let command = server.command { Button(L10n.text("Copy command")) { copy(command) } }
+                if let command = server.displayedCommand(showFull: showFullCommands) { Button(L10n.text("Copy command")) { copy(command) } }
                 Divider()
                 if let root = server.project.root ?? server.cwd, server.cwdExists {
                     Button(L10n.text("Open in editor")) {
@@ -329,9 +331,11 @@ struct SessionValue: View {
                 if let workspace = server.paneWorkspace {
                     Button(L10n.text("Open in Pane")) { NSWorkspace.shared.open(workspace.link) }
                 }
-                Button(L10n.format("Resume in %@", TerminalLauncher.current.name)) {
-                    Usage.record(.resumeSession)
-                    SessionLauncher.resume(session, fallbackDirectory: server.cwd)
+                if session.kind.canResume {
+                    Button(L10n.format("Resume in %@", TerminalLauncher.current.name)) {
+                        Usage.record(.resumeSession)
+                        SessionLauncher.resume(session, fallbackDirectory: server.cwd)
+                    }
                 }
                 if let transcript = session.transcript {
                     Button(L10n.text("Show transcript")) { NSWorkspace.shared.selectFile(transcript.path, inFileViewerRootedAtPath: "") }

@@ -3,13 +3,17 @@ import Foundation
 enum AgentKind: String {
     case claudeCode = "Claude Code"
     case codex = "Codex"
+    case copilot = "Copilot"
 
     var resumeCommand: String {
         switch self {
         case .claudeCode: return "claude --resume"
         case .codex: return "codex resume"
+        case .copilot: return "copilot --resume"
         }
     }
+
+    var canResume: Bool { self != .copilot }
 }
 
 struct AgentSession: Equatable {
@@ -30,14 +34,23 @@ struct AgentSession: Equatable {
 /// server's environment identifies its session exactly. Codex sessions are
 /// matched by working directory against `~/.codex/sessions`.
 final class AgentSessionResolver {
-    private let home = FileManager.default.homeDirectoryForCurrentUser
+    private let home: URL
     private var claudeCache: [String: (session: AgentSession, checkedAt: Date)] = [:]
     private var codexIndex: [String: AgentSession] = [:]
     private var codexIndexedAt: Date = .distantPast
 
-    func resolve(environment: [String: String], cwd: String?, claude: Bool = true, codex: Bool = true) -> AgentSession? {
+    init(home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+        self.home = home
+    }
+
+    func resolve(environment: [String: String], cwd: String?, claude: Bool = true, codex: Bool = true,
+                 copilot: Bool = true) -> AgentSession? {
         if claude, let id = environment["CLAUDE_CODE_SESSION_ID"], !id.isEmpty {
             return claudeSession(id: id)
+        }
+        if let id = environment["COPILOT_AGENT_SESSION_ID"] {
+            guard copilot, let id = Self.validSessionID(id) else { return nil }
+            return copilotSession(id: id)
         }
         // A server started by Claude Code shouldn't be claimed by a Codex session in the same folder.
         guard codex, environment["CLAUDE_CODE_SESSION_ID"] == nil, let cwd else { return nil }
@@ -48,6 +61,31 @@ final class AgentSessionResolver {
         while directory.count > home.path.count {
             if let session = codexIndex[directory] { return session }
             directory = (directory as NSString).deletingLastPathComponent
+        }
+        return nil
+    }
+
+    // MARK: - Copilot
+
+    private func copilotSession(id: String) -> AgentSession {
+        let workspace = home.appendingPathComponent(".copilot/session-state/\(id)/workspace.yaml")
+        let metadata = Self.readHead(of: workspace, bytes: 64 * 1024)
+        return AgentSession(kind: .copilot, id: id, title: nil, transcript: nil, startedAt: nil,
+                            directory: Self.workspaceDirectory(in: metadata))
+    }
+
+    private static func validSessionID(_ value: String) -> String? {
+        UUID(uuidString: value).map { _ in value.lowercased() }
+    }
+
+    private static func workspaceDirectory(in metadata: String) -> String? {
+        for line in metadata.split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("cwd:") || trimmed.hasPrefix("workspace:") else { continue }
+            let value = trimmed.split(separator: ":", maxSplits: 1)[1]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            if value.hasPrefix("/") { return value }
         }
         return nil
     }

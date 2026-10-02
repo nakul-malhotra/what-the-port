@@ -226,4 +226,64 @@ struct ScanEngineTests {
         #expect(!ScanEngine.isAllowed("python3.helper", allowlist: ["python3"]))
         #expect(!ScanEngine.isAllowed("python3.", allowlist: ["python3"]))
     }
+
+    @Test func copilotWrapperAttributesTheExactInheritedSession() {
+        let f = Fixture()
+        f.process(10, name: "zsh")
+        f.arguments[10] = ProcArgs(
+            executablePath: "/bin/zsh",
+            arguments: ["zsh", "-lc", "ghcp"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "c0a8012e-0000-4000-8000-000000000043"]
+        )
+        f.process(20, parent: 10)
+        f.listen(20, port: 3000)
+
+        let server = f.scan()[0]
+
+        #expect(server.agent?.kind.rawValue == "Copilot")
+        #expect(server.agent?.id == "c0a8012e-0000-4000-8000-000000000043")
+    }
+
+    @Test func copilotRequiresAnExactEnabledSessionIdentity() {
+        let f = Fixture()
+        f.process(20)
+        f.arguments[20] = ProcArgs(
+            executablePath: "/usr/local/bin/node",
+            arguments: ["node", "server.js"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "not-a-session-id"]
+        )
+        f.listen(20, port: 3000)
+        #expect(f.scan()[0].agent == nil)
+
+        f.arguments[20] = ProcArgs(
+            executablePath: "/usr/local/bin/node",
+            arguments: ["node", "server.js"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "c0a8012e-0000-4000-8000-000000000043"]
+        )
+        f.config.linkCopilot = false
+        let server = f.scan()[0]
+        #expect(server.agent == nil)
+        #expect(server.port == 3000)
+    }
+
+    @Test func scannerKeepsRawRestartInputsPrivateFromDefaultOutput() {
+        let f = Fixture()
+        let arguments = ["node", "server.js", "--api-key=wtp-test-argv-secret-43"]
+        let environment = ["WTP_TEST_ENV_SECRET_43": "wtp-test-env-secret-43"]
+        f.process(20)
+        f.arguments[20] = ProcArgs(
+            executablePath: "/usr/local/bin/node",
+            arguments: arguments,
+            environment: environment
+        )
+        f.listen(20, port: 3000)
+
+        let server = f.scan()[0]
+
+        #expect(server.command == "node")
+        #expect(server.processes.map(\.name) == ["node"])
+        #expect(server.displayedCommand(showFull: true) == "node server.js --api-key=wtp-test-argv-secret-43")
+        #expect(server.launch?.arguments == arguments)
+        #expect(server.launch?.environment == environment)
+    }
 }

@@ -9,6 +9,7 @@ struct Sample: Equatable {
 struct ServerProcess: Identifiable, Equatable {
     let pid: pid_t
     let name: String
+    let rawName: String
     let depth: Int
     let memory: UInt64
     var cpu: Double = 0
@@ -56,6 +57,7 @@ struct Server: Identifiable {
     var cwd: String?
     var cwdExists: Bool
     var command: String?
+    var rawCommand: String?
     var launch: ProcArgs?
     /// Working directory of the launcher (e.g. where `npm run dev` was run).
     var launchDirectory: String?
@@ -106,5 +108,9 @@ struct Server: Identifiable {
         guard let root = project.root ?? cwd else { return project.name }
         let parent = (root as NSString).deletingLastPathComponent
         return (parent as NSString).abbreviatingWithTildeInPath
+    }
+
+    func displayedCommand(showFull: Bool) -> String? {
+        showFull ? rawCommand : command
     }
 }
