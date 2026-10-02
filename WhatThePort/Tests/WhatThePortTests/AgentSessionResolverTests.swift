@@ -17,19 +17,37 @@ struct AgentSessionResolverTests {
         #expect(missing.id == id)
         #expect(missing.title == nil)
         #expect(missing.directory == nil)
+        #expect(missing.metadataState == .unavailable)
 
         let workspace = home.appendingPathComponent(".copilot/session-state/\(id)/workspace.yaml")
         try FileManager.default.createDirectory(at: workspace.deletingLastPathComponent(), withIntermediateDirectories: true)
         try "cwd: /fixture/project\n".write(to: workspace, atomically: true, encoding: .utf8)
         #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.directory == "/fixture/project")
+        #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.metadataState == .available)
 
         try String(repeating: "x", count: 64 * 1024 + 1).write(to: workspace, atomically: true, encoding: .utf8)
         #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.directory == nil)
+        #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.metadataState == .limited)
     }
 
     @Test func copilotDoesNotResolveFromMalformedIdentityOrCwd() {
         let resolver = AgentSessionResolver(home: FileManager.default.temporaryDirectory)
         #expect(resolver.resolve(environment: ["COPILOT_AGENT_SESSION_ID": "copilot-43"], cwd: "/shared/project") == nil)
         #expect(resolver.resolve(environment: [:], cwd: "/shared/project", codex: false) == nil)
+    }
+
+    @Test func malformedCopilotWorkspaceStaysLimitedWithoutCrashing() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let workspace = home.appendingPathComponent(".copilot/session-state/\(id)/workspace.yaml")
+        try FileManager.default.createDirectory(at: workspace.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "cwd:\n".write(to: workspace, atomically: true, encoding: .utf8)
+
+        let session = try #require(AgentSessionResolver(home: home).resolve(
+            environment: ["COPILOT_AGENT_SESSION_ID": id],
+            cwd: "/shared/project"
+        ))
+        #expect(session.directory == nil)
+        #expect(session.metadataState == .limited)
     }
 }

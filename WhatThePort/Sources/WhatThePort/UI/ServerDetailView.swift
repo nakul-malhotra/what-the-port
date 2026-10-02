@@ -146,6 +146,7 @@ struct ServerDetailView: View {
         }
         if let agent = server.agent {
             rows.append(InfoRow(label: L10n.text("Session ID"), tooltip: agent.id) { Text(agent.id).font(Theme.mono).foregroundStyle(Theme.text2) })
+            rows.append(InfoRow(label: L10n.text("Session metadata")) { Text(agent.metadataState.label).font(Theme.body).foregroundStyle(Theme.text2) })
         }
         if !server.addresses.isEmpty {
             rows.append(InfoRow(label: L10n.text("Address"), tooltip: server.addresses.joined(separator: " · ")) { Text(server.addresses.joined(separator: " · ")).font(Theme.mono).foregroundStyle(Theme.text2) })

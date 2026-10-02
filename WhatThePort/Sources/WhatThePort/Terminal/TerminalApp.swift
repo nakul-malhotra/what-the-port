@@ -345,7 +345,7 @@ final class TerminalApp {
         if let pr = github?.pullRequest {
             items.append(ServerAction(label: "Pull request #\(pr.number)", key: "u") { NSWorkspace.shared.open(pr.url) })
         }
-        if let agent = server.agent {
+        if let agent = server.agent, agent.kind.canResume {
             items.append(ServerAction(label: "Resume \(agent.kind.rawValue) in \(TerminalLauncher.current.name)", key: "a") { [unowned self] in
                 SessionLauncher.resume(agent, fallbackDirectory: server.cwd)
                 show("Resuming in \(TerminalLauncher.current.name)")
@@ -898,6 +898,7 @@ final class TerminalApp {
         }
         if let agent = server.agent {
             secondary.append(row("Session ID", [Span(agent.id, palette.text2)], middle: true))
+            secondary.append(row("Session metadata", [Span(agent.metadataState.label, palette.text2)]))
         }
         if !server.addresses.isEmpty {
             secondary.append(row("Address", [Span(server.addresses.joined(separator: " · "), palette.text2)], middle: true))

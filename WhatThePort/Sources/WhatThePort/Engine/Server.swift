@@ -1,5 +1,17 @@
 import Foundation
 
+enum CommandProjection {
+    static func full(_ arguments: [String]) -> String {
+        arguments.map(shellQuote).joined(separator: " ")
+    }
+
+    static func shellQuote(_ value: String) -> String {
+        let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_./:=@%+,"))
+        if !value.isEmpty, value.unicodeScalars.allSatisfy(safe.contains) { return value }
+        return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+}
+
 struct Sample: Equatable {
     let time: Date
     let memory: UInt64
@@ -58,6 +70,7 @@ struct Server: Identifiable {
     var cwdExists: Bool
     var command: String?
     var rawCommand: String?
+    var rawArguments: [String]?
     var launch: ProcArgs?
     /// Working directory of the launcher (e.g. where `npm run dev` was run).
     var launchDirectory: String?

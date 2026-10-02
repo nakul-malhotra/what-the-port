@@ -16,6 +16,20 @@ enum AgentKind: String {
     var canResume: Bool { self != .copilot }
 }
 
+enum SessionMetadataState: String, Equatable {
+    case available
+    case unavailable
+    case limited
+
+    var label: String {
+        switch self {
+        case .available: return "Available"
+        case .unavailable: return "Unavailable"
+        case .limited: return "Limited"
+        }
+    }
+}
+
 struct AgentSession: Equatable {
     let kind: AgentKind
     let id: String
@@ -24,6 +38,7 @@ struct AgentSession: Equatable {
     let startedAt: Date?
     /// The directory the agent was started in, used to resume it.
     let directory: String?
+    let metadataState: SessionMetadataState
 
     var shortID: String { String(id.prefix(8)) }
 }
@@ -69,32 +84,39 @@ final class AgentSessionResolver {
 
     private func copilotSession(id: String) -> AgentSession {
         let workspace = home.appendingPathComponent(".copilot/session-state/\(id)/workspace.yaml")
-        let metadata = Self.readBoundedWorkspace(of: workspace)
+        let metadata = Self.readCopilotWorkspace(of: workspace, id: id)
         return AgentSession(kind: .copilot, id: id, title: nil, transcript: nil, startedAt: nil,
-                            directory: Self.workspaceDirectory(in: metadata))
+                            directory: metadata.directory, metadataState: metadata.state)
     }
 
     private static func validSessionID(_ value: String) -> String? {
         UUID(uuidString: value).map { _ in value.lowercased() }
     }
 
-    private static func workspaceDirectory(in metadata: String) -> String? {
-        for line in metadata.split(separator: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix("cwd:") || trimmed.hasPrefix("workspace:") else { continue }
-            let value = trimmed.split(separator: ":", maxSplits: 1)[1]
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-            if value.hasPrefix("/") { return value }
-        }
-        return nil
+    private static func readCopilotWorkspace(of url: URL, id: String) -> (directory: String?, state: SessionMetadataState) {
+        let limit = 64 * 1024
+        guard FileManager.default.fileExists(atPath: url.path) else { return (nil, .unavailable) }
+        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else { return (nil, .unavailable) }
+        guard size <= limit, let data = try? Data(contentsOf: url) else { return (nil, .limited) }
+        return workspaceDirectory(in: String(decoding: data, as: UTF8.self), id: id)
     }
 
-    private static func readBoundedWorkspace(of url: URL) -> String {
-        let limit = 64 * 1024
-        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-              size <= limit else { return "" }
-        return readHead(of: url, bytes: limit)
+    private static func workspaceDirectory(in metadata: String, id: String) -> (directory: String?, state: SessionMetadataState) {
+        for line in metadata.split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let parts = trimmed.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2 else { continue }
+            let key = parts[0].trimmingCharacters(in: .whitespaces)
+            let value = parts[1]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            if ["id", "sessionId", "session_id"].contains(key), !value.isEmpty, value.lowercased() != id {
+                return (nil, .limited)
+            }
+            guard key == "cwd" || key == "workspace" else { continue }
+            if value.hasPrefix("/") { return (value, .available) }
+        }
+        return (nil, .limited)
     }
 
     // MARK: - Claude Code
@@ -115,7 +137,8 @@ final class AgentSessionResolver {
             directory = Self.firstValue(of: "cwd", in: head)
         }
         let created = transcript.flatMap { try? $0.resourceValues(forKeys: [.creationDateKey]).creationDate }
-        let session = AgentSession(kind: .claudeCode, id: id, title: title, transcript: transcript, startedAt: created, directory: directory)
+        let session = AgentSession(kind: .claudeCode, id: id, title: title, transcript: transcript, startedAt: created,
+                                   directory: directory, metadataState: transcript == nil ? .unavailable : .available)
         claudeCache[id] = (session, Date())
         return session
     }
@@ -190,7 +213,8 @@ final class AgentSessionResolver {
                   let cwd = payload["cwd"] as? String else { continue }
             if let existing = index[cwd], existing.modified > modified { continue }
             let started = (payload["timestamp"] as? String).flatMap { Self.isoFormatter.date(from: $0) }
-            let session = AgentSession(kind: .codex, id: id, title: titles[id], transcript: url, startedAt: started, directory: cwd)
+            let session = AgentSession(kind: .codex, id: id, title: titles[id], transcript: url, startedAt: started,
+                                       directory: cwd, metadataState: .available)
             index[cwd] = (session, modified)
         }
         codexIndex = index.mapValues(\.session)

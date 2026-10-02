@@ -179,13 +179,14 @@ enum TerminalCommand {
             object["framework"] = server.project.framework
             object["folder"] = server.cwd
             object["command"] = server.displayedCommand(showFull: showFullCommands)
+            if showFullCommands { object["argv"] = server.rawArguments }
             object["startedAt"] = server.startedAt.map(iso.string)
             object["conductorWorkspace"] = server.conductorWorkspace
             if let pane = server.paneWorkspace {
                 object["pane"] = ["workspace": pane.name, "link": pane.link.absoluteString]
             }
             if let agent = server.agent {
-                var session: [String: Any] = ["kind": agent.kind.rawValue, "id": agent.id]
+                var session: [String: Any] = ["kind": agent.kind.rawValue, "id": agent.id, "metadata": agent.metadataState.rawValue]
                 session["title"] = agent.title
                 object["session"] = session
             }

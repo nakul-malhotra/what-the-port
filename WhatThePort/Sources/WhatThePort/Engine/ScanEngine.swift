@@ -28,8 +28,6 @@ final class ScanEngine: @unchecked Sendable {
     ]
     private static let shells: Set<String> = ["sh", "bash", "zsh", "dash", "fish"]
     private static let agentNames: Set<String> = ["claude", "codex", "copilot", "Conductor"]
-    /// Path fragments that identify an agent launched via a runtime like node.
-    private static let agentPathMarkers = ["@anthropic-ai/claude-code", "@github/copilot", "com.conductor.app", "/codex/"]
 
     private let projects = ProjectResolver()
     private let agents = AgentSessionResolver()
@@ -108,9 +106,10 @@ final class ScanEngine: @unchecked Sendable {
                 continue
             }
             let environment = inheritedEnvironment(from: listener, root: root, in: processes)
-            let rawCommand = rootArgs.map { Self.prettyCommand($0.arguments, comm: root.comm) }
+            let projectCommand = rootArgs.map { Self.prettyCommand($0.arguments, comm: root.comm) }
+            let rawCommand = rootArgs.map { CommandProjection.full($0.arguments) }
             let command = rootArgs.map { Self.safeCommand($0, comm: root.comm) }
-            var project = projects.resolve(cwd: cwd, command: rawCommand)
+            var project = projects.resolve(cwd: cwd, command: projectCommand)
             if !config.showBranches { project.branch = nil }
 
             // Restart from the highest process whose argv wasn't overwritten by a
@@ -146,6 +145,7 @@ final class ScanEngine: @unchecked Sendable {
                 cwdExists: cwd.map { FileManager.default.fileExists(atPath: $0) } ?? true,
                 command: command,
                 rawCommand: rawCommand,
+                rawArguments: rootArgs?.arguments,
                 launch: args(for: launcher),
                 launchDirectory: inspector.currentDirectory(launcher.pid) ?? cwd,
                 startedAt: root.startTime,
@@ -212,8 +212,16 @@ final class ScanEngine: @unchecked Sendable {
     private func isAgent(_ process: ProcSnapshot) -> Bool {
         if Self.agentNames.contains(process.comm) { return true }
         guard let args = args(for: process) else { return false }
-        let joined = ([args.executablePath] + args.arguments.prefix(3)).joined(separator: " ")
-        return Self.agentPathMarkers.contains(where: joined.contains)
+        let paths = [args.executablePath] + args.arguments.prefix(2).filter { $0.hasPrefix("/") || $0.hasPrefix(".") }
+        return paths.contains(where: Self.isAgentPath)
+    }
+
+    private static func isAgentPath(_ path: String) -> Bool {
+        let components = URL(fileURLWithPath: path).standardized.pathComponents
+        if components.contains("@anthropic-ai"), components.contains("claude-code") { return true }
+        if components.contains("@github"), components.contains("copilot") { return true }
+        if components.contains("codex") { return true }
+        return components.contains("com.conductor.app")
     }
 
     /// Python distributions may report python3.12, python3.14, etc. Respect
@@ -257,9 +265,13 @@ final class ScanEngine: @unchecked Sendable {
             current = parent
         }
         var environment: [String: String] = [:]
+        var copilotIDs = Set<String>()
         for process in chain.reversed() {
-            environment.merge(args(for: process)?.environment ?? [:]) { _, closer in closer }
+            let values = args(for: process)?.environment ?? [:]
+            if let id = values["COPILOT_AGENT_SESSION_ID"], !id.isEmpty { copilotIDs.insert(id) }
+            environment.merge(values) { _, closer in closer }
         }
+        if copilotIDs.count > 1 { environment.removeValue(forKey: "COPILOT_AGENT_SESSION_ID") }
         return environment
     }
 
@@ -280,10 +292,7 @@ final class ScanEngine: @unchecked Sendable {
 
     private func displayName(for process: ProcSnapshot) -> String {
         guard let args = args(for: process), !args.arguments.isEmpty else { return process.comm }
-        let command = Self.prettyCommand(args.arguments, comm: process.comm)
-        // `process.title` renames like "next-server (v16.0.0)" read better without the version.
-        if let paren = command.range(of: " (") { return String(command[..<paren.lowerBound]) }
-        return command
+        return CommandProjection.full(args.arguments)
     }
 
     private func safeProcessName(for process: ProcSnapshot) -> String {

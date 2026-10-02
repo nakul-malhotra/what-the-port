@@ -286,4 +286,48 @@ struct ScanEngineTests {
         #expect(server.launch?.arguments == arguments)
         #expect(server.launch?.environment == environment)
     }
+
+    @Test func copilotConflictsAcrossAncestorsAreNotAttributed() {
+        let f = Fixture()
+        f.process(5, name: "zsh")
+        f.arguments[5] = ProcArgs(
+            executablePath: "/bin/zsh",
+            arguments: ["zsh"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "11111111-1111-4111-8111-111111111111"]
+        )
+        f.process(10, parent: 5, name: "zsh")
+        f.arguments[10] = ProcArgs(
+            executablePath: "/bin/zsh",
+            arguments: ["zsh"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "22222222-2222-4222-8222-222222222222"]
+        )
+        f.process(20, parent: 10)
+        f.listen(20, port: 3000)
+
+        #expect(f.scan()[0].agent == nil)
+    }
+
+    @Test func fullCommandPreservesEveryArgumentBoundary() {
+        let f = Fixture()
+        let arguments = ["node", "script with spaces", "", " leading ", "quote'arg"]
+        f.process(20)
+        f.arguments[20] = ProcArgs(executablePath: "/usr/local/bin/node", arguments: arguments, environment: [:])
+        f.listen(20, port: 3000)
+
+        #expect(f.scan()[0].displayedCommand(showFull: true) == "node 'script with spaces' '' ' leading ' 'quote'\\''arg'")
+    }
+
+    @Test func copilotPackageMarkerDoesNotMatchAnArbitraryArgument() {
+        let f = Fixture()
+        f.process(10)
+        f.arguments[10] = ProcArgs(
+            executablePath: "/usr/local/bin/node",
+            arguments: ["node", "--label=@github/copilot"],
+            environment: [:]
+        )
+        f.process(20, parent: 10)
+        f.listen(20, port: 3000)
+
+        #expect(f.scan()[0].rootPid == 10)
+    }
 }

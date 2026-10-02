@@ -395,7 +395,7 @@ private struct IntegrationsPane: View {
             }
             Section(L10n.text("Command privacy")) {
                 Toggle(L10n.text("Show full commands"), isOn: $showFullCommands)
-                Text(L10n.text("Commands and process names show executable labels by default. This only affects the app."))
+                Text(L10n.text("Full commands can contain credentials. Commands and process names show executable labels by default. This only affects the app."))
                     .font(Theme.caption)
                     .foregroundStyle(.secondary)
             }
