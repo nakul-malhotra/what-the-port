@@ -69,7 +69,7 @@ final class AgentSessionResolver {
 
     private func copilotSession(id: String) -> AgentSession {
         let workspace = home.appendingPathComponent(".copilot/session-state/\(id)/workspace.yaml")
-        let metadata = Self.readHead(of: workspace, bytes: 64 * 1024)
+        let metadata = Self.readBoundedWorkspace(of: workspace)
         return AgentSession(kind: .copilot, id: id, title: nil, transcript: nil, startedAt: nil,
                             directory: Self.workspaceDirectory(in: metadata))
     }
@@ -88,6 +88,13 @@ final class AgentSessionResolver {
             if value.hasPrefix("/") { return value }
         }
         return nil
+    }
+
+    private static func readBoundedWorkspace(of url: URL) -> String {
+        let limit = 64 * 1024
+        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+              size <= limit else { return "" }
+        return readHead(of: url, bytes: limit)
     }
 
     // MARK: - Claude Code
