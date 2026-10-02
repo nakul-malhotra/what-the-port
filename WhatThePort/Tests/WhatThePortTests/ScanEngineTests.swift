@@ -418,4 +418,38 @@ struct ScanEngineTests {
         eval.listen(20, port: 3000)
         #expect(eval.scan()[0].rootPid == 10)
     }
+
+    @Test func absoluteNodeArgvZeroProtectsClaudeAndCopilotScripts() {
+        let claude = Fixture()
+        claude.process(10)
+        claude.arguments[10] = ProcArgs(
+            executablePath: "/usr/local/bin/node",
+            arguments: ["/usr/local/bin/node", "/node_modules/@anthropic-ai/claude-code/cli.js"],
+            environment: [:]
+        )
+        claude.process(20, parent: 10)
+        claude.listen(20, port: 3000)
+        let claudeServer = claude.scan()[0]
+        #expect(claudeServer.rootPid == 20)
+        #expect(Set(claudeServer.processStarts.keys) == [20])
+
+        let copilot = Fixture()
+        copilot.process(10)
+        copilot.arguments[10] = ProcArgs(
+            executablePath: "/usr/local/bin/node",
+            arguments: ["/usr/local/bin/node", "--no-warnings", "/node_modules/@github/copilot-darwin-arm64/cli.js"],
+            environment: [:]
+        )
+        copilot.process(20, parent: 10)
+        copilot.arguments[20] = ProcArgs(
+            executablePath: "/usr/local/bin/node",
+            arguments: ["node", "server.js"],
+            environment: ["COPILOT_AGENT_SESSION_ID": "c0a8012e-0000-4000-8000-000000000043"]
+        )
+        copilot.listen(20, port: 3000)
+        let copilotServer = copilot.scan()[0]
+        #expect(copilotServer.rootPid == 20)
+        #expect(Set(copilotServer.processStarts.keys) == [20])
+        #expect(copilotServer.agent?.id == "c0a8012e-0000-4000-8000-000000000043")
+    }
 }

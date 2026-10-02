@@ -217,7 +217,7 @@ final class ScanEngine: @unchecked Sendable {
     }
 
     private static func scriptOperands(in arguments: [String]) -> [String] {
-        var index = arguments.first == "node" ? 1 : 0
+        var index = arguments.isEmpty ? 0 : 1
         while index < arguments.count {
             let argument = arguments[index]
             if ["-e", "--eval", "-p", "--print", "-r", "--require", "--import", "--loader"].contains(argument) {
