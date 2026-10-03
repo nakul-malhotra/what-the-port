@@ -281,6 +281,7 @@ struct ScanEngineTests {
         let server = f.scan()[0]
 
         #expect(server.command == "node")
+        #expect(server.displayedCommand(showFull: false) == "node")
         #expect(server.processes.map(\.name) == ["node"])
         #expect(server.displayedCommand(showFull: true) == "node server.js --api-key=wtp-test-argv-secret-43")
         #expect(server.launch?.arguments == arguments)

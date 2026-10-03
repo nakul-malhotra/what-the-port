@@ -25,7 +25,13 @@ struct AgentSessionResolverTests {
         #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.directory == "/fixture/project")
         #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.metadataState == .available)
 
-        try String(repeating: "x", count: 64 * 1024 + 1).write(to: workspace, atomically: true, encoding: .utf8)
+        let prefix = "cwd: /fixture/project\n"
+        let atLimit = prefix + String(repeating: " ", count: 64 * 1024 - prefix.utf8.count)
+        try atLimit.write(to: workspace, atomically: true, encoding: .utf8)
+        #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.directory == "/fixture/project")
+        #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.metadataState == .available)
+
+        try (atLimit + " ").write(to: workspace, atomically: true, encoding: .utf8)
         #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.directory == nil)
         #expect(resolver.resolve(environment: environment, cwd: "/shared/project")?.metadataState == .limited)
     }
@@ -34,6 +40,23 @@ struct AgentSessionResolverTests {
         let resolver = AgentSessionResolver(home: FileManager.default.temporaryDirectory)
         #expect(resolver.resolve(environment: ["COPILOT_AGENT_SESSION_ID": "copilot-43"], cwd: "/shared/project") == nil)
         #expect(resolver.resolve(environment: [:], cwd: "/shared/project", codex: false) == nil)
+    }
+
+    @Test func unreadableCopilotWorkspaceKeepsMinimalAssociation() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let workspace = home.appendingPathComponent(".copilot/session-state/\(id)/workspace.yaml")
+        try FileManager.default.createDirectory(at: workspace.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "cwd: /fixture/project\n".write(to: workspace, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: workspace.path)
+
+        let session = try #require(AgentSessionResolver(home: home).resolve(
+            environment: ["COPILOT_AGENT_SESSION_ID": id], cwd: "/shared/project"
+        ))
+        #expect(session.id == id)
+        #expect(session.directory == nil)
+        #expect(session.title == nil)
+        #expect(session.metadataState == .unavailable)
     }
 
     @Test func ambiguousCopilotSignalDoesNotFallBackToCodex() throws {
