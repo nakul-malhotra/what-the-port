@@ -91,8 +91,9 @@ export function SectionCopy({ index, stars }: { index: number; stars: number | n
           <PortLabel port="3000" colon="on" label="Sessions" />
           <h2 className={styles.headline}>Knows which agent started it.</h2>
           <p className={styles.body}>
-            Servers launched by Claude Code, Codex, GitHub Copilot, Conductor or Pane link back to the session that started them. Pick up
-            the conversation, check the branch, or open the Vercel preview for the same commit.
+            Servers show the Claude Code, Codex, GitHub Copilot, Conductor or Pane session that started them. Resume Claude
+            Code or Codex conversations; Copilot shows its local session identity. Check the branch or open the Vercel preview
+            for the same commit.
           </p>
           <ul className={styles.list}>
             {TOOLS.map((tool) => (
