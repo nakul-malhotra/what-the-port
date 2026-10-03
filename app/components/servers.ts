@@ -97,7 +97,7 @@ export const SERVERS: Server[] = [
       note: l.format('Idle %@ · no connections', l.duration(300, true)),
       running: l.duration(300),
     }),
-    session: { agent: 'copilot', title: 'Copilot CLI session', id: 'c7e20b91' },
+    session: { agent: 'copilot', title: 'Copilot CLI session', id: 'c7e20b91-4a44-4b31-bc65-0c8239dc7e20' },
     chart: 'flat',
     spark: 'M0 13 L4 13 L8 12.5 L12 13 L16 13 L20 13 L24 12.5 L28 13 L32 13 L36 13 L40 13 L44 13',
     processes: [

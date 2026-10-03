@@ -2,6 +2,10 @@
 import assert from 'node:assert/strict'
 import { SERVERS, serverResources, stoppedPorts } from '../app/components/servers.ts'
 
+const copilot = SERVERS.find(server => server.session?.agent === 'copilot')
+assert(copilot, 'The demo must represent the Copilot integration')
+assert.match(copilot.session.id, /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i)
+
 for (const server of SERVERS) {
   const resources = serverResources([server])
   assert.equal(resources.memory, server.memory, `Memory mismatch on :${server.port}`)
